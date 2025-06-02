@@ -1,4 +1,4 @@
-# Go Data Ingestion Service
+# Data Ingestion Service
 
 This is a Go-based microservice for ingesting data from an external API, transforming it, and storing the result in AWS S3. It exposes RESTful endpoints for triggering ingestion, viewing stored data, and checking health status.
 
