@@ -7,6 +7,8 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/data_ingestion_pipeline/api"
+
+	"github.com/data_ingestion_pipeline/internal"
 )
 
 
@@ -34,6 +36,9 @@ func main() {
 	if region == "" || accessKey == "" || secretKey == "" || bucket == "" {
 		log.Fatal("One or more required environment variables are missing")
 	}
+
+	// Initialize S3 bucket createion if not exists once on app start
+	internal.CreateS3Bucket()
 
 	//API routes and respective handlers.
 	http.HandleFunc("/ingest", api.IngestHandler)

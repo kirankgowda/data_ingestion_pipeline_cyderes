@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -17,6 +18,65 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
+
+var once sync.Once
+
+
+// CreateS3Bucket Is used to create a Bucket in S3 when app is bought up.
+// If the bucket already exists it moves on
+func CreateS3Bucket() {
+	once.Do(func() {
+		awsAccessKey := os.Getenv("AWS_ACCESS_KEY_ID")
+		awsSecretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+		awsRegion := os.Getenv("AWS_REGION")
+		bucketName := os.Getenv("S3_BUCKET")
+
+		sess, err := session.NewSession(&aws.Config{
+			Region: aws.String(awsRegion),
+			Credentials: credentials.NewStaticCredentials(
+				awsAccessKey, awsSecretKey, ""),
+		})
+		if err != nil {
+			log.Fatalf("Failed to create AWS session: %v", err)
+		}
+
+		s3Client := s3.New(sess)
+		log.Printf("S3 client initialized for region: %s", awsRegion)
+
+		// Check if the bucket exists
+		_, err = s3Client.HeadBucket(&s3.HeadBucketInput{
+			Bucket: aws.String(bucketName),
+		})
+
+		if err == nil {
+			log.Printf("Bucket '%s' already exists.", bucketName)
+			return
+		}
+
+		// Check if the error is a "NotFound" error
+		if awsErr, ok := err.(awserr.Error); ok {
+			if awsErr.Code() == "NotFound" || awsErr.Code() == "404" {
+				log.Printf("Bucket '%s' not found. Creating it now...", bucketName)
+
+				_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
+					Bucket: aws.String(bucketName),
+					CreateBucketConfiguration: &s3.CreateBucketConfiguration{
+						LocationConstraint: aws.String(awsRegion),
+					},
+				})
+				if err != nil {
+					log.Fatalf("Failed to create bucket: %v", err)
+				}
+
+				log.Printf("Bucket '%s' created successfully.", bucketName)
+				return
+			}
+		}
+
+		log.Fatalf("Error checking bucket: %v", err)
+	})
+}
+
 
 //UploadToS3 is used to upload a Json file to an AWS S3 bucket, return error if any
 func UploadToS3(filename string, data interface{}) error {
