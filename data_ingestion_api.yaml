@@ -9,7 +9,7 @@ servers:
     description: Devlopment server
 
 paths:
-  /health:
+  /healthcheck:
     get:
       summary: Health check endpoint
       description: Returns API status.
@@ -23,7 +23,7 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowed'
 
-  /ingest:
+  /ingestdata:
     post:
       summary: Ingest data and store to S3
       description: Initiates data ingestion, Transforms it and uploads the ingested data to S3.
@@ -82,7 +82,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /latest:
+  /latestdata:
     get:
       summary: Get latest ingestion metadata and data
       description: Returns metadata of the latest ingestion and the corresponding data.

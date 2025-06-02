@@ -41,11 +41,11 @@ func main() {
 	internal.CreateS3Bucket()
 
 	//API routes and respective handlers.
-	http.HandleFunc("/ingest", api.IngestHandler)
-	http.HandleFunc("/health", api.HealthHandler)
+	http.HandleFunc("/ingestdata", api.IngestHandler)
+	http.HandleFunc("/healthcheck", api.HealthHandler)
 	http.HandleFunc("/getdata", api.GetDataHandler)
 	http.HandleFunc("/listfiles", api.ListFilesHandler)
-	http.HandleFunc("/latest", api.GetLatestIngestionHandler)
+	http.HandleFunc("/latestdata", api.GetLatestIngestionHandler)
 	http.HandleFunc("/delete", api.DeleteFileHandler)
 
 	port := os.Getenv("PORT")
