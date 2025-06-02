@@ -1,0 +1,99 @@
+name: Go Build and Deploy to ECS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/go-data-ingestor:latest
+
+jobs:
+  build-test-deploy:
+    name: Build, Test, Dockerize, and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.22
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Run go mod tidy
+        run: go mod tidy
+
+      - name: Run Go tests
+        run: go test ./... -v
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t $IMAGE_NAME .
+
+      - name: Push Docker image
+        run: docker push $IMAGE_NAME
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get current ECS task definition
+        id: get-task-def
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ secrets.ECS_TASK_FAMILY }} \
+            --query "taskDefinition" \
+            > task-def.json
+
+      - name: Update task definition with new image and env vars
+        id: update-task-def
+        run: |
+          cat task-def.json | jq \
+            --arg image "${{ env.IMAGE_NAME }}" \
+            --arg s3 "${{ secrets.S3_BUCKET }}" \
+            --arg port "${{ secrets.PORT }}" \
+            --arg aws_id "${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            --arg aws_secret "${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            --arg region "${{ secrets.AWS_REGION }}" \
+            '
+            .containerDefinitions[0].image = $image |
+            .containerDefinitions[0].environment = [
+              { "name": "AWS_ACCESS_KEY_ID", "value": $aws_id },
+              { "name": "AWS_SECRET_ACCESS_KEY", "value": $aws_secret },
+              { "name": "AWS_REGION", "value": $region },
+              { "name": "S3_BUCKET", "value": $s3 },
+              { "name": "PORT", "value": $port }
+            ] |
+            del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+            ' > new-task-def.json
+
+      - name: Register new ECS task definition
+        id: register-task-def
+        run: |
+          aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json \
+            > new-task-def-out.json
+
+      - name: Deploy new task definition to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ secrets.ECS_CLUSTER }} \
+            --service ${{ secrets.ECS_SERVICE }} \
+            --force-new-deployment

@@ -1,0 +1,5 @@
+# Ignore Go caches and modules
+.go
+.cache
+**/pkg
+**/bin%

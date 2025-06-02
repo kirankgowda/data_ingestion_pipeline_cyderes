@@ -1,0 +1,6 @@
+.git
+.go
+.cache
+new-task-def.json
+*.log
+*.tmp%

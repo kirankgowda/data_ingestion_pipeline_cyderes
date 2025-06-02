@@ -1,0 +1,269 @@
+openapi: 3.0.3
+info:
+  title: Data Ingestion Pipeline API
+  version: 1.0.0
+  description: API for ingesting, retrieving, listing, and deleting data files stored in S3.
+
+servers:
+  - url: https://localhost:5000
+    description: Devlopment server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns API status.
+      responses:
+        '200':
+          description: API is up and running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /ingest:
+    post:
+      summary: Ingest data and store to S3
+      description: Initiates data ingestion, Transforms it and uploads the ingested data to S3.
+      responses:
+        '200':
+          description: Data ingested successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /getdata:
+    get:
+      summary: Retrieve ingested data by filename
+      description: Fetches ingested data from S3 based on the filename query parameter.
+      parameters:
+        - in: query
+          name: filename
+          schema:
+            type: string
+          required: true
+          description: Filename to fetch data for
+      responses:
+        '200':
+          description: Data fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDataResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /listfiles:
+    get:
+      summary: List all ingested files
+      description: Lists filenames stored in the S3 bucket under the "logs/" prefix.
+      responses:
+        '200':
+          description: List of files
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListFilesResponse'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /latest:
+    get:
+      summary: Get latest ingestion metadata and data
+      description: Returns metadata of the latest ingestion and the corresponding data.
+      responses:
+        '200':
+          description: Latest ingestion fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LatestIngestionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /delete:
+    delete:
+      summary: Delete a file from S3
+      description: Deletes a file specified by the filename query parameter.
+      parameters:
+        - in: query
+          name: filename
+          schema:
+            type: string
+          required: true
+          description: Filename to delete
+      responses:
+        '200':
+          description: File deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteFileResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: API is up and running
+
+    IngestResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Data ingested and uploaded to S3 successfully
+        filename:
+          type: string
+          description: Name of the ingested file
+          example: data_20250602.json
+        count:
+          type: integer
+          description: Number of records ingested
+          example: 123
+
+    GetDataResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Data Fetched Successfully
+        records:
+          type: array
+          items:
+            type: object
+          description: Array of ingested data records
+
+    ListFilesResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Files listed successfully
+        filenames:
+          type: array
+          items:
+            type: string
+          example: ["data_20250601.json", "data_20250602.json"]
+
+    LatestIngestionResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Latest ingestion fetched successfully
+        metadata:
+          type: object
+          description: Metadata about the latest ingestion
+          example:
+            filename: data_20250602.json
+            ingested_at: "2025-06-02T10:00:00Z"
+        data:
+          type: array
+          items:
+            type: object
+          description: Array of records from the latest ingestion
+
+    DeleteFileResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: File deleted successfully
+
+  responses:
+    MethodNotAllowed:
+      description: Method not allowed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: error
+              message:
+                type: string
+                example: Method not allowed
+
+    BadRequest:
+      description: Bad request error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: error
+              message:
+                type: string
+                example: Missing or invalid query parameter
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: error
+              message:
+                type: string
+                example: File not found in S3
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: error
+              message:
+                type: string
+                example: Internal server error
